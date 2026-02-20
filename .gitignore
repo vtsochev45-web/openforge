@@ -1,0 +1,4 @@
+node_modules/
+.next/
+*.node
+generated/*/node_modules/
