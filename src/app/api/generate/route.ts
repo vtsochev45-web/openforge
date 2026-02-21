@@ -473,3 +473,4 @@ function createFallbackFrontendApp(prompt: string): GeneratedApp {
     runCommand: "npm run dev",
   };
 }
+}
