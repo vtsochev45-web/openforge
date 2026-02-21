@@ -87,12 +87,40 @@ openforge/
 ├── src/
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── generate/route.ts      # AI code generation API
+│   │   │   ├── ai-chat/route.ts       # AI chat for code collaboration
+│   │   │   ├── ai-collab/chat/route.ts # AI collaboration endpoints
+│   │   │   ├── auth/[...nextauth]/    # NextAuth.js authentication
+│   │   │   ├── generate/route.ts      # AI code generation API with backend integration
 │   │   │   └── project/[id]/          # Project management APIs
-│   │   ├── project/[id]/page.tsx      # Project viewer/editor
+│   │   │       ├── exec/route.ts      # Run generated apps
+│   │   │       ├── files/route.ts     # File CRUD operations
+│   │   │       ├── restore/route.ts   # Version restore
+│   │   │       └── versions/route.ts  # Version history
+│   │   ├── project/[id]/page.tsx      # Project viewer/editor with Monaco
 │   │   ├── page.tsx                   # Main prompt interface
 │   │   └── layout.tsx
-│   └── components/ui/                 # shadcn/ui components
+│   ├── components/
+│   │   ├── ai-collab/                 # AI Collaboration components
+│   │   │   ├── AIChatSidebar.tsx      # AI chat panel
+│   │   │   ├── CodeSuggestionOverlay.tsx # Inline code suggestions
+│   │   │   └── VersionHistory.tsx     # Version tracking UI
+│   │   └── ui/                        # shadcn/ui components
+│   └── lib/
+│       ├── api/                       # API generation utilities
+│       │   ├── api-generator.ts       # CRUD route generator
+│       │   ├── templates/             # Code templates
+│       │   ├── types.ts               # TypeScript definitions
+│       │   └── utils.ts               # API utilities
+│       ├── auth.ts                    # NextAuth configuration
+│       ├── auth/                      # Auth utilities
+│       │   ├── templates.ts           # Auth component templates
+│       │   └── validators.ts          # Input validation
+│       ├── db/                        # Database utilities
+│       │   ├── index.ts               # Database exports
+│       │   └── schema-generator.ts    # Prisma schema generation
+│       └── prisma.ts                  # Prisma client singleton
+├── prisma/
+│   └── schema.prisma                  # Base Prisma schema with auth models
 ├── generated/                         # Generated apps stored here
 └── docs/
     └── openforge-plan.md              # Original plan
@@ -122,12 +150,17 @@ generated/{project-id}/
 - Prompt-based app generation
 - Project listing and viewing
 - Monaco Editor for code viewing
+- **AI Chat Sidebar** - Iterative code improvement with AI
+- **Version History** - Track and restore code changes
+- **Database Integration (Prisma)** - Auto-generated schemas and CRUD API routes
+- **Authentication (NextAuth.js)** - Complete auth system with login/register
+- **Backend Infrastructure** - Automatic Prisma + API route generation
 - Basic terminal output for install/run commands
 
 🚧 In Progress:
-- Live code editing
-- Database integration (Prisma)
-- Authentication templates
+- Build optimization for Vercel deployment
+- CRUD template refinements
+- Database migration automation
 
 ## Roadmap
 
@@ -137,17 +170,21 @@ generated/{project-id}/
 - [x] Project management (create, view, list)
 - [x] Monaco Editor integration
 
-### Phase 2: Code Quality
-- [ ] Live code editing with save
-- [ ] Iterative improvement (chat with AI about code)
-- [ ] Syntax highlighting for all file types
-- [ ] File creation/deletion
+### Phase 2: Code Quality ✅ DONE
+- [x] Live code editing with save
+- [x] Iterative improvement (chat with AI about code)
+- [x] **AI Chat Sidebar** - Real-time AI collaboration
+- [x] **Version History** - Track code changes
+- [x] Syntax highlighting for all file types
+- [x] File creation/deletion
 
-### Phase 3: Backend Integration
-- [ ] Prisma schema generation
-- [ ] Database connection setup
-- [ ] Auth template generation (NextAuth/Lucia)
-- [ ] API route generation
+### Phase 3: Backend Integration ✅ DONE
+- [x] **Prisma schema generation** - Extract models from prompts
+- [x] **Database connection setup** - SQLite/Postgres with Prisma
+- [x] **Auth template generation** - NextAuth.js with bcrypt
+- [x] **API route generation** - Full CRUD endpoints (list, create, read, update, delete)
+- [x] **Soft delete support** - Optional soft delete patterns
+- [x] **Backend-First Architecture** - Programmatic backend + AI frontend merge
 
 ### Phase 4: Deployment
 - [x] Vercel deploy button
