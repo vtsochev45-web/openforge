@@ -12,7 +12,7 @@ export async function POST(
 ) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const projectId = params.id;
+    const projectId = _params.id;
     const { versionId } = await req.json();
     // TODO: Use projectId when restore logic is implemented
     // const projectId = params.id;
