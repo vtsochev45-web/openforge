@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  // Generate types for the client
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "sqlite"
+  // Use env variable for database URL
+  // For SQLite: file:./dev.db
+  // For PostgreSQL: postgresql://user:password@localhost:5432/dbname
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// BASE MODELS
+// These models are required for authentication and core functionality
+// ============================================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  image          String?
+  password       String?   // For credentials provider
+  role           String    @default("user") // admin, user, etc.
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime? // For soft delete
+
+  // Relations
+  accounts Account[]
+  sessions Session[]
+  
+  // AI-GENERATED-RELATIONS-BELOW
+  // Add your model relations here
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================================
+// AI-GENERATED-MODELS
+// Place application-specific models below this line
+// They will be appended here by the schema generator
+// ============================================================================
+
+// Example model structure for reference:
+// model Post {
+//   id        String   @id @default(cuid())
+//   title     String
+//   content   String?
+//   published Boolean  @default(false)
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+//   deletedAt DateTime? // Soft delete
+//   
+//   author   User   @relation(fields: [authorId], references: [id])
+//   authorId String
+// }

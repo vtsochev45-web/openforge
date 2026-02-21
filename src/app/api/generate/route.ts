@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
+import { extractSchemaFromPrompt, generatePrismaSchema, generateEnvTemplate } from "@/lib/db";
+import { generateAPRoutes } from "@/lib/api-generator";
+import type { ModelDefinition } from "@/lib/db";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const WORKSPACE_DIR = process.env.VERCEL ? "/tmp/openforge" : "/home/tim/.openclaw/workspace";
@@ -16,6 +19,7 @@ interface GeneratedApp {
   files: FileStructure[];
   installCommand: string;
   runCommand: string;
+  schema?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -75,8 +79,77 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/**
+ * Generate backend infrastructure files based on extracted models
+ */
+async function generateBackendInfrastructure(
+  models: ModelDefinition[],
+  appName: string
+): Promise<FileStructure[]> {
+  const files: FileStructure[] = [];
+  const provider = process.env.DATABASE_PROVIDER || "sqlite";
+
+  // Generate Prisma schema
+  const schemaConfig = {
+    provider: provider as "sqlite" | "postgresql",
+    url: 'env("DATABASE_URL")',
+  };
+  const prismaSchema = generatePrismaSchema(models, schemaConfig);
+
+  files.push({
+    path: "prisma/schema.prisma",
+    content: prismaSchema,
+  });
+
+  // Generate API routes
+  const apiRoutes = generateAPRoutes(models, { authRequired: true }, { softDelete: true });
+
+  for (const route of apiRoutes) {
+    files.push({
+      path: `src/app/${route.path}`,
+      content: route.content,
+    });
+  }
+
+  // Generate .env.example
+  files.push({
+    path: ".env.example",
+    content: generateEnvTemplate(provider),
+  });
+
+  // Generate lib files
+  files.push(
+    {
+      path: "src/lib/prisma.ts",
+      content: `import { PrismaClient } from '@prisma/client';
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+});
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+`,
+    },
+    {
+      path: "src/lib/db.ts",
+      content: `export { prisma } from './prisma';
+`,
+    }
+  );
+
+  return files;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function generateFullStackApp(prompt: string, projectId: string): Promise<GeneratedApp> {
+  // Phase 3: Extract models from prompt and generate backend infrastructure
+  const models = await extractSchemaFromPrompt(prompt);
+  const backendFiles = await generateBackendInfrastructure(models, projectId);
+
   const systemPrompt = `You are an expert full-stack developer. Generate a complete FULL-STACK Next.js 14 application with database, auth, and API routes.
 
 TECH STACK:
@@ -87,6 +160,9 @@ TECH STACK:
 - NextAuth.js for authentication
 - bcrypt for password hashing
 - Server Actions for mutations
+
+IMPORTANT: Your schema must match these models exactly:
+${models.map(m => `- ${m.name}: ${m.fields.map(f => f.name).join(', ')}`).join('\n')}
 
 CRITICAL RULES:
 1. Generate REAL, WORKING code - no placeholders, no "TODO" comments
@@ -99,19 +175,17 @@ CRITICAL RULES:
 
 REQUIRED FILES TO GENERATE:
 1. package.json - with ALL dependencies
-2. prisma/schema.prisma - complete database schema
-3. src/lib/prisma.ts - Prisma client setup
-4. src/lib/auth.ts - NextAuth configuration
-5. src/app/api/auth/[...nextauth]/route.ts - Auth API route
-6. src/app/api/models/route.ts - REST API endpoints
-7. src/app/actions.ts - Server Actions for forms
-8. src/app/page.tsx - Main page with all features
-9. src/app/layout.tsx - Root layout with auth provider
-10. src/app/globals.css - Tailwind + custom styles
-11. src/middleware.ts - Auth protection
-12. next.config.js, tsconfig.json, tailwind.config.ts
-13. .env.example - Environment variables
-14. README.md - Setup instructions
+2. prisma/schema.prisma - complete database schema (see models above)
+3. src/lib/auth.ts - NextAuth configuration
+4. src/app/api/auth/[...nextauth]/route.ts - Auth API route
+5. src/app/api/models/route.ts - REST API endpoints
+6. src/app/actions.ts - Server Actions for forms
+7. src/app/page.tsx - Main page with all features
+8. src/app/layout.tsx - Root layout with auth provider
+9. src/app/globals.css - Tailwind + custom styles
+10. src/middleware.ts - Auth protection
+11. next.config.js, tsconfig.json, tailwind.config.ts
+12. README.md - Setup instructions
 
 OUTPUT FORMAT - Respond with ONLY a JSON object:
 {
@@ -167,12 +241,41 @@ OUTPUT FORMAT - Respond with ONLY a JSON object:
 
   try {
     const parsed = JSON.parse(jsonStr);
-    return parsed as GeneratedApp;
+    const aiGeneratedApp = parsed as GeneratedApp;
+
+    // Phase 3: Merge AI-generated frontend with programmatic backend
+    // Prioritize backend-infrastructure files over AI-generated ones
+    const aiFilePaths = new Set(aiGeneratedApp.files.map(f => f.path));
+
+    // Filter out AI-generated backend files that we generate programmatically
+    const filteredAiFiles = aiGeneratedApp.files.filter(f => {
+      const isBackendFile =
+        f.path === 'prisma/schema.prisma' ||
+        f.path.startsWith('src/app/api/') ||
+        f.path === 'src/lib/prisma.ts' ||
+        f.path.startsWith('src/lib/api');
+      return !isBackendFile;
+    });
+
+    // Merge: AI frontend + programmatic backend
+    aiGeneratedApp.files = [
+      ...filteredAiFiles,
+      ...backendFiles,
+    ];
+
+    return aiGeneratedApp;
   } catch {
-    console.error("Failed to parse AI response, using fallback");
-    return createFallbackFullStackApp(prompt);
+    console.error("Failed to parse AI response, using fallback with backend infrastructure");
+
+    // Fallback with backend infrastructure
+    const fallbackApp = createFallbackFullStackApp(prompt);
+    fallbackApp.files = [
+      ...fallbackApp.files.filter(f => !f.path.startsWith('src/app/api/')),
+      ...backendFiles,
+    ];
+    return fallbackApp;
   }
-}
+
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function generateFrontendApp(prompt: string, projectId: string): Promise<GeneratedApp> {
