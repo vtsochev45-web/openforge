@@ -1,0 +1,11 @@
+# Prometheus - Personal AI Synthesis
+# No external dependencies required - pure Python!
+
+# Optional dependencies for enhanced features:
+# numpy>=1.24.0  # For faster holographic memory (falls back to pure Python)
+# requests>=2.31.0  # For internet navigation layer
+# flask>=2.3.0  # For web interface
+
+# Development dependencies:
+# pytest>=7.4.0
+# black>=23.0.0

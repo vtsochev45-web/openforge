@@ -1,0 +1,26 @@
+{
+  "editor.inlineSuggest.enabled": true,
+  "github.copilot.enable": {
+    "*": true,
+    "markdown": true,
+    "plaintext": true
+  },
+  "github.copilot.inlineSuggest.enable": true,
+  "typescript.tsdk": "./node_modules/typescript/lib",
+  "editor.quickSuggestions": {
+    "strings": true
+  },
+  "tailwindCSS.suggestions": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "emmet.includeLanguages": {
+    "typescript": "html",
+    "typescriptreact": "html"
+  },
+  "typescript.preferences.autoImportFileExcludePatterns": [
+    "node_modules/next/router"
+  ]
+}
