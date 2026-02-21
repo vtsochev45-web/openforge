@@ -203,14 +203,14 @@ export function generateAPIDocumentation(
         title: 'Generated API',
         version: '1.0.0',
       },
-      paths: endpoints.reduce((acc: Record<string, unknown>, endpoint) => {
-        if (!acc[endpoint.path]) acc[endpoint.path] = {};
+      paths: endpoints.reduce((acc: Record<string, Record<string, unknown>>, endpoint) => {
+        if (!acc[endpoint.path]) acc[endpoint.path] = {} as Record<string, unknown>;
         acc[endpoint.path][endpoint.method.toLowerCase()] = {
           summary: endpoint.description,
           security: endpoint.auth ? [{ bearerAuth: [] }] : undefined,
         };
         return acc;
-      }, {} as Record<string, unknown>),
+      }, {} as Record<string, Record<string, unknown>>),
     },
     null,
     2
