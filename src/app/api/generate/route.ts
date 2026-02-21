@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
-import { extractSchemaFromPrompt, generatePrismaSchema, generateEnvTemplate } from "@/lib/db";
-import { generateAPRoutes } from "@/lib/api-generator";
-import type { ModelDefinition } from "@/lib/db";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const WORKSPACE_DIR = process.env.VERCEL ? "/tmp/openforge" : "/home/tim/.openclaw/workspace";
@@ -19,7 +16,6 @@ interface GeneratedApp {
   files: FileStructure[];
   installCommand: string;
   runCommand: string;
-  schema?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -79,77 +75,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/**
- * Generate backend infrastructure files based on extracted models
- */
-async function generateBackendInfrastructure(
-  models: ModelDefinition[],
-  appName: string
-): Promise<FileStructure[]> {
-  const files: FileStructure[] = [];
-  const provider = process.env.DATABASE_PROVIDER || "sqlite";
-
-  // Generate Prisma schema
-  const schemaConfig = {
-    provider: provider as "sqlite" | "postgresql",
-    url: 'env("DATABASE_URL")',
-  };
-  const prismaSchema = generatePrismaSchema(models, schemaConfig);
-
-  files.push({
-    path: "prisma/schema.prisma",
-    content: prismaSchema,
-  });
-
-  // Generate API routes
-  const apiRoutes = generateAPRoutes(models, { authRequired: true }, { softDelete: true });
-
-  for (const route of apiRoutes) {
-    files.push({
-      path: `src/app/${route.path}`,
-      content: route.content,
-    });
-  }
-
-  // Generate .env.example
-  files.push({
-    path: ".env.example",
-    content: generateEnvTemplate(provider),
-  });
-
-  // Generate lib files
-  files.push(
-    {
-      path: "src/lib/prisma.ts",
-      content: `import { PrismaClient } from '@prisma/client';
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-});
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
-`,
-    },
-    {
-      path: "src/lib/db.ts",
-      content: `export { prisma } from './prisma';
-`,
-    }
-  );
-
-  return files;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function generateFullStackApp(prompt: string, projectId: string): Promise<GeneratedApp> {
-  // Phase 3: Extract models from prompt and generate backend infrastructure
-  const models = await extractSchemaFromPrompt(prompt);
-  const backendFiles = await generateBackendInfrastructure(models, projectId);
-
   const systemPrompt = `You are an expert full-stack developer. Generate a complete FULL-STACK Next.js 14 application with database, auth, and API routes.
 
 TECH STACK:
@@ -160,9 +86,6 @@ TECH STACK:
 - NextAuth.js for authentication
 - bcrypt for password hashing
 - Server Actions for mutations
-
-IMPORTANT: Your schema must match these models exactly:
-${models.map(m => `- ${m.name}: ${m.fields.map(f => f.name).join(', ')}`).join('\n')}
 
 CRITICAL RULES:
 1. Generate REAL, WORKING code - no placeholders, no "TODO" comments
@@ -175,7 +98,7 @@ CRITICAL RULES:
 
 REQUIRED FILES TO GENERATE:
 1. package.json - with ALL dependencies
-2. prisma/schema.prisma - complete database schema (see models above)
+2. prisma/schema.prisma - complete database schema
 3. src/lib/auth.ts - NextAuth configuration
 4. src/app/api/auth/[...nextauth]/route.ts - Auth API route
 5. src/app/api/models/route.ts - REST API endpoints
@@ -226,11 +149,9 @@ OUTPUT FORMAT - Respond with ONLY a JSON object:
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
 
-
   if (!content) {
     throw new Error("No content in AI response");
   }
-
 
   let jsonStr = content;
   const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/);
@@ -238,42 +159,14 @@ OUTPUT FORMAT - Respond with ONLY a JSON object:
     jsonStr = jsonMatch[1];
   }
 
-
   try {
     const parsed = JSON.parse(jsonStr);
-    const aiGeneratedApp = parsed as GeneratedApp;
-
-    // Phase 3: Merge AI-generated frontend with programmatic backend
-    // Prioritize backend-infrastructure files over AI-generated ones
-    const aiFilePaths = new Set(aiGeneratedApp.files.map(f => f.path));
-
-    // Filter out AI-generated backend files that we generate programmatically
-    const filteredAiFiles = aiGeneratedApp.files.filter(f => {
-      const isBackendFile =
-        f.path === 'prisma/schema.prisma' ||
-        f.path.startsWith('src/app/api/') ||
-        f.path === 'src/lib/prisma.ts' ||
-        f.path.startsWith('src/lib/api');
-      return !isBackendFile;
-    });
-
-    // Merge: AI frontend + programmatic backend
-    aiGeneratedApp.files = [
-      ...filteredAiFiles,
-      ...backendFiles,
-    ];
-
-    return aiGeneratedApp;
+    return parsed as GeneratedApp;
   } catch {
-    console.error("Failed to parse AI response, using fallback with backend infrastructure");
-
-    // Fallback with backend infrastructure
-    const fallbackApp = createFallbackFullStackApp(prompt);
-    fallbackApp.files = [
-      ...fallbackApp.files.filter(f => !f.path.startsWith('src/app/api/')),
-      ...backendFiles,
-    ];
-    return fallbackApp;
+    console.error("Failed to parse AI response, using fallback");
+    return createFallbackFullStackApp(prompt);
+  }
+}
 
 async function generateFrontendApp(prompt: string, projectId: string): Promise<GeneratedApp> {
   const systemPrompt = `You are an expert frontend developer. Generate a complete React/Next.js frontend application.
@@ -321,7 +214,6 @@ OUTPUT FORMAT - Respond with ONLY a JSON object with files array.`;
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
 
-
   if (!content) {
     throw new Error("No content in AI response");
   }
@@ -331,6 +223,7 @@ OUTPUT FORMAT - Respond with ONLY a JSON object with files array.`;
   if (jsonMatch) {
     jsonStr = jsonMatch[1];
   }
+
   try {
     const parsed = JSON.parse(jsonStr);
     return parsed as GeneratedApp;
@@ -356,18 +249,12 @@ function createFallbackFullStackApp(prompt: string): GeneratedApp {
             dev: "next dev",
             build: "next build",
             start: "next start",
-            lint: "next lint",
-            "db:generate": "prisma generate",
-            "db:push": "prisma db push",
-            "db:studio": "prisma studio"
+            lint: "next lint"
           },
           dependencies: {
             "next": "14.2.5",
             "react": "^18",
             "react-dom": "^18",
-            "@prisma/client": "^5.8.0",
-            "next-auth": "^4.24.5",
-            "bcryptjs": "^2.4.3",
             "lucide-react": "^0.400.0"
           },
           devDependencies: {
@@ -375,8 +262,6 @@ function createFallbackFullStackApp(prompt: string): GeneratedApp {
             "@types/node": "^20",
             "@types/react": "^18",
             "@types/react-dom": "^18",
-            "@types/bcryptjs": "^2.4.6",
-            "prisma": "^5.8.0",
             "tailwindcss": "^3.4.1",
             "postcss": "^8",
             "autoprefixer": "^10",
@@ -385,41 +270,36 @@ function createFallbackFullStackApp(prompt: string): GeneratedApp {
           }
         }, null, 2)
       },
-      // Prisma schema
       {
-        path: "prisma/schema.prisma",
-        content: `generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  posts     Post[]
-}
-
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  String
-}
-`
+        path: "src/app/page.tsx",
+        content: `export default function Home() {
+  return (
+    <main className="min-h-screen p-8">
+      <h1 className="text-4xl font-bold">Welcome to ${name || 'Your App'}</h1>
+      <p className="mt-4 text-gray-600">${prompt}</p>
+    </main>
+  );
+}`
       },
-      // ... more files
+      {
+        path: "src/app/layout.tsx",
+        content: `export const metadata = {
+  title: '${name || 'My App'}',
+  description: 'Generated by OpenForge',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}`
+      }
     ],
     installCommand: "npm install",
     runCommand: "npm run dev",
@@ -464,11 +344,19 @@ function createFallbackFrontendApp(prompt: string): GeneratedApp {
           }
         }, null, 2)
       },
-      // ... more files
+      {
+        path: "src/app/page.tsx",
+        content: `export default function Home() {
+  return (
+    <main className="min-h-screen p-8">
+      <h1 className="text-4xl font-bold">${name || 'Frontend App'}</h1>
+      <p className="mt-4">${prompt}</p>
+    </main>
+  );
+}`
+      }
     ],
     installCommand: "npm install",
     runCommand: "npm run dev",
   };
 }
-}
-  }
