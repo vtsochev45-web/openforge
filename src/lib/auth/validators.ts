@@ -236,7 +236,7 @@ export function validateName(name: string): ValidationResult {
     errors.push('Name must not exceed 100 characters');
   }
   
-  if (!/^[a-zA-Z\s'-]+$/u.test(sanitized)) {
+  if (!/^[a-zA-Z\s'-]+$/.test(sanitized)) {
     errors.push('Name contains invalid characters');
   }
   
