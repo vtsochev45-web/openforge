@@ -69,7 +69,7 @@ export function createErrorResponse(
   statusCode: number = HttpStatus.INTERNAL_SERVER_ERROR,
   details?: string,
   field?: string
-): NextResponse<APIResponse<never>> {
+): NextResponse {
   const error: APIError = { code, message };
   if (details) error.details = details;
   if (field) error.field = field;
