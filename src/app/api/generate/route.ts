@@ -75,7 +75,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function generateFullStackApp(prompt: string, _projectId: string // eslint-disable-line @typescript-eslint/no-unused-vars): Promise<GeneratedApp> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function generateFullStackApp(prompt: string, _projectId: string): Promise<GeneratedApp> {
   const systemPrompt = `You are an expert full-stack developer. Generate a complete FULL-STACK Next.js 14 application with database, auth, and API routes.
 
 TECH STACK:
@@ -168,7 +169,8 @@ OUTPUT FORMAT - Respond with ONLY a JSON object:
   }
 }
 
-async function generateFrontendApp(prompt: string, _projectId: string // eslint-disable-line @typescript-eslint/no-unused-vars): Promise<GeneratedApp> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function generateFrontendApp(prompt: string, _projectId: string): Promise<GeneratedApp> {
   const systemPrompt = `You are an expert frontend developer. Generate a complete React/Next.js frontend application.
 
 TECH STACK:

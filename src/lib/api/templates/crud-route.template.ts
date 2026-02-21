@@ -1,14 +1,8 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-/**
- * CRUD Route Template Generator
- *
- * Generates full CRUD Next.js App Router route handlers for Prisma models.
- *
- * @module lib/api/templates/crud-route
- */
-
+import { GeneratedRoute } from '../types';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ModelDefinition } from '../../db/schema-generator';
-import { APIConfig, CrudOptions, GeneratedRoute } from '../types';
+import { APIConfig, CrudOptions } from '../types';
 
 /**
  * Generate a complete CRUD route file content
@@ -137,7 +131,7 @@ export async function POST(req: NextRequest) {
 
     if (missingFields.length > 0) {
       return ApiErrors.validationError(
-        \\\`Missing required fields: \${missingFields.join(', ')}\\\`,
+        \\`Missing required fields: \\${missingFields.join(', ')}\\\`,
         missingFields.join(',')
       );
     }
@@ -159,7 +153,7 @@ export async function POST(req: NextRequest) {
     // Handle Prisma unique constraint errors
     if (error?.code === 'P2002') {
       return ApiErrors.conflict(
-        \\\`A \${MODEL_NAME} with this \${error?.meta?.target?.[0]} already exists\\\`
+        \\`A \\${MODEL_NAME} with this \\${error?.meta?.target?.[0]} already exists\\\`
       );
     }
 
@@ -367,7 +361,9 @@ function _getSortableFields(model: ModelDefinition): string {
   return `const SORTABLE_FIELDS = [${fields.join(', ')}, 'createdAt', 'updatedAt'];`;
 }
 
-export default {
+const crudRouteTemplates = {
   generateCrudRouteContent,
   generateDynamicRouteContent,
 };
+
+export default crudRouteTemplates;
