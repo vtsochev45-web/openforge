@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
 
     if (missingFields.length > 0) {
       return ApiErrors.validationError(
-        \\\`Missing required fields: \\\${missingFields.join(', ')}\\\`,
+        \\\`Missing required fields: \${missingFields.join(', ')}\\\`,
         missingFields.join(',')
       );
     }
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
     // Handle Prisma unique constraint errors
     if (error?.code === 'P2002') {
       return ApiErrors.conflict(
-        \\\`A \\\${MODEL_NAME} with this \\\${error?.meta?.target?.[0]} already exists\\\`
+        \\\`A \${MODEL_NAME} with this \${error?.meta?.target?.[0]} already exists\\\`
       );
     }
 
