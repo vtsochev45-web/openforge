@@ -131,7 +131,7 @@ OUTPUT FORMAT - Respond with ONLY a JSON object:
         "X-Title": "OpenForge",
       },
       body: JSON.stringify({
-        model: "openrouter/google/gemini-2.5-flash",
+        model: "google/gemini-2.0-flash-001",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Build this full-stack app: ${prompt}` },
@@ -198,7 +198,7 @@ OUTPUT FORMAT - Respond with ONLY a JSON object with files array.`;
         "X-Title": "OpenForge",
       },
       body: JSON.stringify({
-        model: "openrouter/google/gemini-2.5-flash",
+        model: "google/gemini-2.0-flash-001",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Build this frontend app: ${prompt}` },
