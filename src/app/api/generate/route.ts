@@ -154,20 +154,35 @@ OUTPUT FORMAT - Respond with ONLY a JSON object:
     throw new Error("No content in AI response");
   }
 
+  // Log the raw response for debugging
+  console.log("AI raw response (first 500 chars):", content.slice(0, 500));
+
   let jsonStr = content;
-  const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/);
+  
+  // Try to extract JSON from markdown code blocks
+  const jsonMatch = content.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
   if (jsonMatch) {
-    jsonStr = jsonMatch[1];
+    jsonStr = jsonMatch[1].trim();
+    console.log("Extracted JSON from code block (first 200 chars):", jsonStr.slice(0, 200));
+  } else {
+    // Try to find JSON object between curly braces
+    const jsonObjMatch = content.match(/(\{[\s\S]*\})/);
+    if (jsonObjMatch) {
+      jsonStr = jsonObjMatch[1].trim();
+      console.log("Extracted JSON object (first 200 chars):", jsonStr.slice(0, 200));
+    }
   }
 
   try {
     const parsed = JSON.parse(jsonStr);
+    console.log("Successfully parsed AI response");
     return parsed as GeneratedApp;
-  } catch {
-    console.error("Failed to parse AI response, using fallback");
+  } catch (parseError) {
+    console.error("Failed to parse AI response:", parseError);
+    console.error("JSON string that failed:", jsonStr.slice(0, 500));
     return createFallbackFullStackApp(prompt);
   }
-}
+
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function generateFrontendApp(prompt: string, _projectId: string): Promise<GeneratedApp> {
@@ -220,19 +235,33 @@ OUTPUT FORMAT - Respond with ONLY a JSON object with files array.`;
     throw new Error("No content in AI response");
   }
 
+  // Log the raw response for debugging
+  console.log("AI raw response (first 500 chars):", content.slice(0, 500));
+
   let jsonStr = content;
-  const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/);
+  
+  // Try to extract JSON from markdown code blocks
+  const jsonMatch = content.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
   if (jsonMatch) {
-    jsonStr = jsonMatch[1];
+    jsonStr = jsonMatch[1].trim();
+  } else {
+    // Try to find JSON object between curly braces
+    const jsonObjMatch = content.match(/(\{[\s\S]*\})/);
+    if (jsonObjMatch) {
+      jsonStr = jsonObjMatch[1].trim();
+    }
   }
 
   try {
     const parsed = JSON.parse(jsonStr);
+    console.log("Successfully parsed AI response");
     return parsed as GeneratedApp;
-  } catch {
+  } catch (parseError) {
+    console.error("Failed to parse AI response:", parseError);
+    console.error("JSON string that failed:", jsonStr.slice(0, 500));
     return createFallbackFrontendApp(prompt);
   }
-}
+
 
 function createFallbackFullStackApp(prompt: string): GeneratedApp {
   const name = prompt.split(" ").slice(0, 3).join("-").toLowerCase().replace(/[^a-z0-9-]/g, "-");
