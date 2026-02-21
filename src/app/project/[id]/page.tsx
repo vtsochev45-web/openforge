@@ -275,7 +275,7 @@ export default function ProjectPage() {
                 ) : (
                   <div className="text-center">
                     <div className="text-4xl mb-2">📦</div>
-                    <div>Click "Start App" to run and preview</div>
+                    <div>Click &quot;Start App&quot; to run and preview</div>
                   </div>
                 )}
               </div>
