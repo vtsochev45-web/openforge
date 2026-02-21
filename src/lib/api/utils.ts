@@ -183,8 +183,8 @@ export function buildWhereClause(
       // Not equal
       conditions.push({ [key]: { not: value.replace('neq:', '') } });
     } else if (value.includes('*')) {
-      // Wildcard search
-      conditions.push({ [key]: { contains: value.replace(/*/g, '%') } });
+      // Wildcard search - escape the star for regex
+      conditions.push({ [key]: { contains: value.replace(/\*/g, '%') } });
     } else if (value.startsWith('~')) {
       // Fuzzy search (contains)
       conditions.push({ [key]: { contains: value.slice(1), mode: 'insensitive' } });
@@ -321,7 +321,7 @@ export function handleCORS(origin?: string): NextResponse {
   });
 }
 
-export default {
+const apiUtils = {
   HttpStatus,
   ErrorCodes,
   createSuccessResponse,
@@ -338,3 +338,5 @@ export default {
   createCORSHeaders,
   handleCORS,
 };
+
+export default apiUtils;
