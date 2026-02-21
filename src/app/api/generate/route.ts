@@ -274,10 +274,7 @@ OUTPUT FORMAT - Respond with ONLY a JSON object:
       ...backendFiles,
     ];
     return fallbackApp;
-  }
 
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function generateFrontendApp(prompt: string, projectId: string): Promise<GeneratedApp> {
   const systemPrompt = `You are an expert frontend developer. Generate a complete React/Next.js frontend application.
 
@@ -474,3 +471,4 @@ function createFallbackFrontendApp(prompt: string): GeneratedApp {
   };
 }
 }
+  }

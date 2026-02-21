@@ -38,8 +38,8 @@ import {
 const MODEL_NAME = '${modelName}';
 const AUTH_REQUIRED = ${config.authRequired};
 const SOFT_DELETE = ${options.softDelete ?? false};
-${options.includeRelations?.length ? `const INCLUDE_RELATIONS = ${JSON.stringify(options.includeRelations)};` : 'const INCLUDE_RELATIONS = undefined;'}
-${options.searchableFields?.length ? `const SEARCHABLE_FIELDS = ${JSON.stringify(options.searchableFields)};` : 'const SEARCHABLE_FIELDS = ['name', 'description', 'title'];'}
+${options.includeRelations?.length ? `const INCLUDE_RELATIONS = ${JSON.stringify(options.includeRelations)};` : "const INCLUDE_RELATIONS = undefined;"}
+${options.searchableFields?.length ? `const SEARCHABLE_FIELDS = ${JSON.stringify(options.searchableFields)};` : "const SEARCHABLE_FIELDS = ['name', 'description', 'title'];"}
 ${_getFilterableFields(model)}
 ${_getSortableFields(model)}
 
