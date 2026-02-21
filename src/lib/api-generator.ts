@@ -203,7 +203,7 @@ export function generateAPIDocumentation(
         title: 'Generated API',
         version: '1.0.0',
       },
-      paths: endpoints.reduce((acc, endpoint) => {
+      paths: endpoints.reduce((acc: Record<string, unknown>, endpoint) => {
         if (!acc[endpoint.path]) acc[endpoint.path] = {};
         acc[endpoint.path][endpoint.method.toLowerCase()] = {
           summary: endpoint.description,
