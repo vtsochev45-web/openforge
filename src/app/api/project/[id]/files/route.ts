@@ -19,7 +19,7 @@ async function getProjectPath(projectId: string): Promise<string | null> {
     // Query the main server for project location
     const result = await execAsync(`openclaw project list --json`);
     const projects = JSON.parse(result.stdout);
-    const project = projects.find((p: any) => p.id === projectId);
+    const project = projects.find((p: { id: string; path?: string }) => p.id === projectId);
     return project?.path || null;
   } catch {
     return null;

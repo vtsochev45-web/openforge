@@ -11,8 +11,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const projectId = params.id;
     const { versionId } = await req.json();
+    // TODO: Use projectId when restore logic is implemented
+    // const projectId = params.id;
 
     // TODO: Implement actual restore logic
     // This should:

@@ -8,7 +8,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // In-memory storage for demo - replace with database in production
-const versionStore: Record<string, any[]> = {};
+interface Version {
+  id: string;
+  version: number;
+  description?: string;
+  files?: unknown;
+  createdAt: string;
+  createdBy?: string;
+}
+
+const versionStore: Record<string, Version[]> = {};
 
 export async function GET(
   req: NextRequest,

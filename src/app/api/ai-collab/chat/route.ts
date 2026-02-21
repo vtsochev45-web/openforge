@@ -13,7 +13,9 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { projectId, messages, currentFile, selectedCode } = body;
+    const { messages } = body;
+    // TODO: Use these when AI integration is implemented
+    // const { projectId, currentFile, selectedCode } = body;
 
     // TODO: Integrate with actual AI service (OpenAI, Anthropic, etc.)
     // This is a placeholder response
