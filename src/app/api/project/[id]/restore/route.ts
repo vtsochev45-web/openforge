@@ -8,9 +8,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params: _params }: { params: { id: string } }
 ) {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const projectId = params.id;
     const { versionId } = await req.json();
     // TODO: Use projectId when restore logic is implemented
     // const projectId = params.id;
