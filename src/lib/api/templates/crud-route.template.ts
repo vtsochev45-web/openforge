@@ -1,12 +1,6 @@
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { GeneratedRoute } from '../types';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { ModelDefinition } from '../../db/schema-generator';
 import { APIConfig, CrudOptions } from '../types';
 
-/**
- * Generate a complete CRUD route file content
- */
 export function generateCrudRouteContent(
   model: ModelDefinition,
   config: APIConfig,
@@ -16,91 +10,62 @@ export function generateCrudRouteContent(
   const modelNameLower = modelName.toLowerCase();
   const modelNamePlural = `${modelNameLower}s`;
 
+  const requiredFieldsStr = JSON.stringify(_getRequiredFields(model));
+  const includeRelations = options.includeRelations?.length ? `const INCLUDE_RELATIONS = ${JSON.stringify(options.includeRelations)};` : "const INCLUDE_RELATIONS = undefined;";
+  const searchableFields = options.searchableFields?.length ? `const SEARCHABLE_FIELDS = ${JSON.stringify(options.searchableFields)};` : "const SEARCHABLE_FIELDS = ['name', 'description', 'title'];";
+  const filterableFields = _getFilterableFields(model);
+  const sortableFields = _getSortableFields(model);
+  const authCheck = config.authRequired ? `const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return ApiErrors.unauthorized();
+    }` : '';
+
   return `import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import {
   parseQueryParams,
-  buildWhereClause,
   createSuccessResponse,
   createPaginationMeta,
   ApiErrors,
   serializeBigInt,
 } from '@/lib/api/utils';
 
-// Configuration
 const MODEL_NAME = '${modelName}';
 const AUTH_REQUIRED = ${config.authRequired};
 const SOFT_DELETE = ${options.softDelete ?? false};
-${options.includeRelations?.length ? `const INCLUDE_RELATIONS = ${JSON.stringify(options.includeRelations)};` : "const INCLUDE_RELATIONS = undefined;"}
-${options.searchableFields?.length ? `const SEARCHABLE_FIELDS = ${JSON.stringify(options.searchableFields)};` : "const SEARCHABLE_FIELDS = ['name', 'description', 'title'];"}
-${_getFilterableFields(model)}
-${_getSortableFields(model)}
+${includeRelations}
+${searchableFields}
+${filterableFields}
+${sortableFields}
 
-/**
- * GET /api/${modelNamePlural}
- * List all ${modelNamePlural} with pagination, filtering, and sorting
- */
 export async function GET(req: NextRequest) {
   try {
-    // Check auth if required
-    ${config.authRequired ? `const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return ApiErrors.unauthorized();
-    }
-    ` : ''}
-
-    // Parse query parameters
+    ${authCheck}
     const { pagination, filters, sort, search } = parseQueryParams(req);
-
-    // Build where clause
     const where: Record<string, unknown> = {};
-
-    // Add soft delete filter
-    if (SOFT_DELETE) {
-      where.deletedAt = null;
-    }
-
-    // Add search if provided
+    if (SOFT_DELETE) where.deletedAt = null;
     if (search && SEARCHABLE_FIELDS.length > 0) {
       where.OR = SEARCHABLE_FIELDS.map(field => ({
         [field]: { contains: search, mode: 'insensitive' },
       }));
     }
-
-    // Add filters
     Object.entries(filters).forEach(([key, value]) => {
-      if (value && FILTERABLE_FIELDS.includes(key)) {
-        where[key] = value;
-      }
+      if (value && FILTERABLE_FIELDS.includes(key)) where[key] = value;
     });
-
-    // Build orderBy
-    const orderBy: Record<string, string> = {};
-    if (SORTABLE_FIELDS.includes(sort.field)) {
-      orderBy[sort.field] = sort.order;
-    } else {
-      orderBy.createdAt = 'desc';
-    }
-
-    // Execute query
+    const orderBy: Record<string, string> = SORTABLE_FIELDS.includes(sort.field)
+      ? { [sort.field]: sort.order }
+      : { createdAt: 'desc' };
     const [items, total] = await Promise.all([
       prisma.${modelNameLower}.findMany({
-        where,
-        skip: pagination.offset,
-        take: pagination.limit,
-        orderBy,
+        where, skip: pagination.offset, take: pagination.limit, orderBy,
         ...(INCLUDE_RELATIONS ? { include: INCLUDE_RELATIONS } : {}),
       }),
       prisma.${modelNameLower}.count({ where }),
     ]);
-
-    // Serialize response (handle BigInt)
-    const serializedItems = serializeBigInt(items);
-
     return createSuccessResponse(
-      serializedItems,
+      serializeBigInt(items),
       createPaginationMeta(pagination.page, pagination.limit, total)
     );
   } catch (error) {
@@ -109,63 +74,37 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/**
- * POST /api/${modelNamePlural}
- * Create a new ${modelName}
- */
 export async function POST(req: NextRequest) {
   try {
-    // Check auth if required
-    ${config.authRequired ? `const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return ApiErrors.unauthorized();
-    }
-    ` : ''}
-
-    // Parse request body
+    ${authCheck}
     const body = await req.json();
-
-    // Validate required fields
-    const requiredFields = ${JSON.stringify(_getRequiredFields(model))};
+    const requiredFields = ${requiredFieldsStr};
     const missingFields = requiredFields.filter(field => !body[field]);
-
     if (missingFields.length > 0) {
       return ApiErrors.validationError(
-        \\`Missing required fields: \\${missingFields.join(', ')}\\\`,
+        'Missing required fields: ' + missingFields.join(', '),
         missingFields.join(',')
       );
     }
-
-    ${options.auditLog ? `// Add audit fields
-    body.createdBy = session?.user?.id;
-    body.updatedBy = session?.user?.id;` : ''}
-
-    // Create record
+    ${options.auditLog ? 'body.createdBy = session?.user?.id; body.updatedBy = session?.user?.id;' : ''}
     const item = await prisma.${modelNameLower}.create({
       data: body,
       ...(INCLUDE_RELATIONS ? { include: INCLUDE_RELATIONS } : {}),
     });
-
     return createSuccessResponse(serializeBigInt(item), undefined, 201);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating ${modelName}:', error);
-
-    // Handle Prisma unique constraint errors
     if (error?.code === 'P2002') {
       return ApiErrors.conflict(
-        \\`A \\${MODEL_NAME} with this \\${error?.meta?.target?.[0]} already exists\\\`
+        'A ' + MODEL_NAME + ' with this ' + (error?.meta?.target?.[0] || 'field') + ' already exists'
       );
     }
-
     return ApiErrors.internalError('Failed to create ' + MODEL_NAME);
   }
 }
 `;
 }
 
-/**
- * Generate dynamic route content (single item operations)
- */
 export function generateDynamicRouteContent(
   model: ModelDefinition,
   config: APIConfig,
@@ -173,54 +112,36 @@ export function generateDynamicRouteContent(
 ): string {
   const modelName = model.name;
   const modelNameLower = modelName.toLowerCase();
-  const modelNamePlural = `${modelNameLower}s`;
+
+  const includeRelations = options.includeRelations?.length ? `const INCLUDE_RELATIONS = ${JSON.stringify(options.includeRelations)};` : 'const INCLUDE_RELATIONS = undefined;';
+  const authCheck = config.authRequired ? `const session = await getServerSession(authOptions);
+    if (!session?.user) return ApiErrors.unauthorized();` : '';
 
   return `import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import {
-  createSuccessResponse,
-  ApiErrors,
-  serializeBigInt,
-  getIdFromParams,
-} from '@/lib/api/utils';
+import { createSuccessResponse, ApiErrors, serializeBigInt } from '@/lib/api/utils';
 
-// Configuration
 const MODEL_NAME = '${modelName}';
 const SOFT_DELETE = ${options.softDelete ?? false};
-${options.includeRelations?.length ? `const INCLUDE_RELATIONS = ${JSON.stringify(options.includeRelations)};` : 'const INCLUDE_RELATIONS = undefined;'}
+${includeRelations}
 
 interface RouteContext {
   params: { id: string };
 }
 
-/**
- * GET /api/${modelNamePlural}/[id]
- * Get a single ${modelName} by ID
- */
 export async function GET(req: NextRequest, { params }: RouteContext) {
   try {
     const { id } = params;
-
-    if (!id) {
-      return ApiErrors.badRequest('ID is required');
-    }
-
+    if (!id) return ApiErrors.badRequest('ID is required');
     const where: Record<string, unknown> = { id };
-    if (SOFT_DELETE) {
-      where.deletedAt = null;
-    }
-
+    if (SOFT_DELETE) where.deletedAt = null;
     const item = await prisma.${modelNameLower}.findFirst({
       where,
       ...(INCLUDE_RELATIONS ? { include: INCLUDE_RELATIONS } : {}),
     });
-
-    if (!item) {
-      return ApiErrors.notFound(MODEL_NAME);
-    }
-
+    if (!item) return ApiErrors.notFound(MODEL_NAME);
     return createSuccessResponse(serializeBigInt(item));
   } catch (error) {
     console.error('Error fetching ${modelName}:', error);
@@ -228,118 +149,49 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   }
 }
 
-/**
- * PATCH /api/${modelNamePlural}/[id]
- * Update a ${modelName} by ID
- */
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   try {
-    // Check auth
-    ${config.authRequired ? `const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return ApiErrors.unauthorized();
-    }
-    ` : ''}
-
+    ${authCheck}
     const { id } = params;
-
-    if (!id) {
-      return ApiErrors.badRequest('ID is required');
-    }
-
-    // Check if exists
-    const existing = await prisma.${modelNameLower}.findUnique({
-      where: { id },
-    });
-
-    if (!existing) {
-      return ApiErrors.notFound(MODEL_NAME);
-    }
-
-    // Parse and validate update data
+    if (!id) return ApiErrors.badRequest('ID is required');
+    const existing = await prisma.${modelNameLower}.findUnique({ where: { id } });
+    if (!existing) return ApiErrors.notFound(MODEL_NAME);
     const body = await req.json();
-    delete body.id; // Prevent ID change
-    delete body.createdAt; // Prevent timestamp changes
-
-    ${options.auditLog ? `body.updatedBy = session?.user?.id;
-    body.updatedAt = new Date();` : ''}
-
-    const item = await prisma.${modelNameLower}.update({
-      where: { id },
-      data: body,
+    delete body.id;
+    delete body.createdAt;
+    ${options.auditLog ? 'body.updatedBy = session?.user?.id; body.updatedAt = new Date();' : ''}
+    const item = await prisma.${modelNameLower}.update({ where: { id }, data: body,
       ...(INCLUDE_RELATIONS ? { include: INCLUDE_RELATIONS } : {}),
     });
-
     return createSuccessResponse(serializeBigInt(item));
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating ${modelName}:', error);
-
-    if (error?.code === 'P2025') {
-      return ApiErrors.notFound(MODEL_NAME);
-    }
-
-    if (error?.code === 'P2002') {
-      return ApiErrors.conflict('Unique constraint violation');
-    }
-
+    if (error?.code === 'P2025') return ApiErrors.notFound(MODEL_NAME);
+    if (error?.code === 'P2002') return ApiErrors.conflict('Unique constraint violation');
     return ApiErrors.internalError('Failed to update ' + MODEL_NAME);
   }
 }
 
-/**
- * DELETE /api/${modelNamePlural}/[id]
- * Delete a ${modelName} by ID
- */
 export async function DELETE(req: NextRequest, { params }: RouteContext) {
   try {
-    // Check auth
-    ${config.authRequired ? `const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return ApiErrors.unauthorized();
-    }
-    ` : ''}
-
+    ${authCheck}
     const { id } = params;
-
-    if (!id) {
-      return ApiErrors.badRequest('ID is required');
-    }
-
-    // Check if exists
-    ${options.softDelete ? `const existing = await prisma.${modelNameLower}.findUnique({
-      where: { id },
-    });
-
-    if (!existing) {
-      return ApiErrors.notFound(MODEL_NAME);
-    }
-
-    // Soft delete
+    if (!id) return ApiErrors.badRequest('ID is required');
+    ${options.softDelete ? `const existing = await prisma.${modelNameLower}.findUnique({ where: { id } });
+    if (!existing) return ApiErrors.notFound(MODEL_NAME);
     await prisma.${modelNameLower}.update({
       where: { id },
-      data: {
-        deletedAt: new Date(),
-        ${options.auditLog ? 'deletedBy: session?.user?.id,' : ''}
-      },
-    });` : `await prisma.${modelNameLower}.delete({
-      where: { id },
-    });`}
-
+      data: { deletedAt: new Date(), ${options.auditLog ? 'deletedBy: session?.user?.id,' : ''} },
+    });` : `await prisma.${modelNameLower}.delete({ where: { id } });`}
     return new NextResponse(null, { status: 204 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting ${modelName}:', error);
-
-    if (error?.code === 'P2025') {
-      return ApiErrors.notFound(MODEL_NAME);
-    }
-
+    if (error?.code === 'P2025') return ApiErrors.notFound(MODEL_NAME);
     return ApiErrors.internalError('Failed to delete ' + MODEL_NAME);
   }
 }
 `;
 }
-
-// Helper functions for template generation
 
 function _getRequiredFields(model: ModelDefinition): string[] {
   return model.fields
@@ -361,9 +213,4 @@ function _getSortableFields(model: ModelDefinition): string {
   return `const SORTABLE_FIELDS = [${fields.join(', ')}, 'createdAt', 'updatedAt'];`;
 }
 
-const crudRouteTemplates = {
-  generateCrudRouteContent,
-  generateDynamicRouteContent,
-};
-
-export default crudRouteTemplates;
+export default { generateCrudRouteContent, generateDynamicRouteContent };
