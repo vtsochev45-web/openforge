@@ -177,9 +177,10 @@ function generateModelSchema(model: ModelDefinition): string {
  * Extract model definitions from a natural language prompt using AI
  * This is a placeholder - in production this would call an LLM
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function extractSchemaFromPrompt(
   prompt: string,
-  options: { useAI?: boolean } = {}
+  _options: { useAI?: boolean } = {}
 ): Promise<ModelDefinition[]> {
   // Default models for common app types
   const promptLower = prompt.toLowerCase();
